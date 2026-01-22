@@ -1,79 +1,82 @@
 import { Controller, Get } from '@nestjs/common';
-import type { EditionResponse } from '@readr/contracts';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { EditionResponse, ScreenCard } from '@readr/contracts';
+import { Repository } from 'typeorm';
+
+import { CardEntity } from '../db/entities/card.entity';
+import { EditionEntity } from '../db/entities/edition.entity';
 import { getCurrent12HourWindowLabel } from '../lib/timeWindow';
+
+// Derive the specific card union members from ScreenCard (no need to import HomeCard/NewsCard)
+type HomeCard = Extract<ScreenCard, { type: 'HOME' }>;
+type NewsCard = Extract<ScreenCard, { type: 'NEWS' }>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function toHomeCard(row: CardEntity): HomeCard {
+  const payload = (isRecord(row.payload)
+    ? row.payload
+    : {}) as unknown as HomeCard['payload'];
+
+  return {
+    id: row.cardId,
+    type: 'HOME',
+    payload,
+  };
+}
+
+function toNewsCard(row: CardEntity): NewsCard {
+  const payload = (isRecord(row.payload)
+    ? row.payload
+    : {}) as unknown as NewsCard['payload'];
+
+  return {
+    id: row.cardId,
+    type: 'NEWS',
+    payload,
+  };
+}
+
+function toScreenCard(row: CardEntity): ScreenCard {
+  if (row.type === 'HOME') return toHomeCard(row);
+  if (row.type === 'NEWS') return toNewsCard(row);
+
+  // Non-payload cards (WELCOME, END_TODAY, EXTENDED, END_EXTENDED, etc.)
+  return {
+    id: row.cardId,
+    type: row.type as ScreenCard['type'],
+  } as ScreenCard;
+}
 
 @Controller('edition')
 export class EditionController {
+  constructor(
+    @InjectRepository(EditionEntity)
+    private readonly editions: Repository<EditionEntity>,
+  ) {}
+
   @Get('current')
-  current(): EditionResponse {
+  async current(): Promise<EditionResponse> {
     const windowLabel = getCurrent12HourWindowLabel();
+
+    const edition = await this.editions.findOne({
+      where: { windowLabel },
+      relations: ['cards'],
+    });
+
+    if (!edition) {
+      return { window: windowLabel, cards: [] };
+    }
+
+    const cardsSorted = [...(edition.cards ?? [])].sort(
+      (a, b) => a.position - b.position,
+    );
 
     return {
       window: windowLabel,
-      cards: [
-        { id: 'welcome-1', type: 'WELCOME' },
-
-        {
-          id: 'home-1',
-          type: 'HOME',
-          payload: {
-            greetingName: 'Anuraag',
-            location: 'Dallas, TX',
-            windowLabel,
-          },
-        },
-
-        {
-          id: 'news-1',
-          type: 'NEWS',
-          payload: {
-            headline: 'Markets steady as investors await major economic data',
-            whatHappened:
-              'Major indices traded in a narrow range while traders positioned for upcoming reports.',
-            whyItMatters:
-              'Key releases can shift rate expectations and affect borrowing costs across the economy.',
-            whatsNext:
-              'Watch inflation and jobs data for clearer direction this week.',
-            source: 'Mock Source',
-          },
-        },
-
-        {
-          id: 'news-2',
-          type: 'NEWS',
-          payload: {
-            headline:
-              'City expands transit pilot program to more neighborhoods',
-            whatHappened:
-              'A new set of routes will be added to improve connectivity during peak hours.',
-            whyItMatters:
-              'Better access can reduce commute times and ease road congestion.',
-            source: 'Mock Source',
-          },
-        },
-
-        { id: 'end-today-1', type: 'END_TODAY' },
-
-        { id: 'extended-1', type: 'EXTENDED' },
-
-        {
-          id: 'news-3',
-          type: 'NEWS',
-          payload: {
-            headline:
-              'Tech firms highlight AI safety controls in new deployments',
-            whatHappened:
-              'Several companies described guardrails and evaluation methods for their latest releases.',
-            whyItMatters:
-              'Better controls reduce risk and improve trust as AI adoption accelerates.',
-            whatsNext:
-              'Expect more standardization around testing and reporting.',
-            source: 'Mock Source',
-          },
-        },
-
-        { id: 'end-extended-1', type: 'END_EXTENDED' },
-      ],
+      cards: cardsSorted.map(toScreenCard),
     };
   }
 }
