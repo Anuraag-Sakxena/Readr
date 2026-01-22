@@ -1,5 +1,7 @@
-import type { NewsCardPayload, ScreenCard } from '@readr/contracts';
+'use client';
 
+import type React from 'react';
+import type { NewsCardPayload, ScreenCard } from '@readr/contracts';
 
 function Shell({
   title,
@@ -10,19 +12,25 @@ function Shell({
   subtitle?: string;
   children?: React.ReactNode;
 }) {
+  const isDev = process.env.NODE_ENV !== 'production';
+
   return (
-    <div className="h-full w-full px-6 py-10 flex flex-col">
-      <div className="max-w-2xl w-full mx-auto flex-1 flex flex-col">
+    <div className="flex h-full w-full flex-col px-6 py-10">
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col">
         <div className="space-y-2">
           <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-          {subtitle ? <p className="text-sm text-neutral-600">{subtitle}</p> : null}
+          {subtitle ? (
+            <p className="text-sm text-neutral-600">{subtitle}</p>
+          ) : null}
         </div>
 
         <div className="mt-8 flex-1">{children}</div>
 
-        <div className="mt-6 text-xs text-neutral-500">
-          Swipe ↑/↓ or use ↑/↓ keys
-        </div>
+        {isDev ? (
+          <div className="mt-6 text-xs text-neutral-500">
+            Swipe ↑/↓ or use ↑/↓ keys
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -30,18 +38,17 @@ function Shell({
 
 export function WelcomeCard() {
   return (
-    <Shell
-      title="Welcome to Readr"
-      subtitle="Get informed. Get out."
-    >
+    <Shell title="Welcome to Readr" subtitle="Get informed. Get out.">
       <div className="space-y-4">
         <p className="text-neutral-700 leading-relaxed">
-          Readr is built for clarity—finite editions, clean summaries, and a calm end.
+          Readr is built for clarity—finite editions, clean summaries, and a calm
+          end.
         </p>
 
         <div className="rounded-2xl border bg-white p-4 shadow-sm">
           <p className="text-sm text-neutral-700">
-            Phase 1: this is mocked data. Next we’ll wire real edition + session logic.
+            Phase 1: this is mocked data. Next we’ll wire real edition + session
+            logic.
           </p>
         </div>
       </div>
@@ -58,31 +65,29 @@ export function HomeCard({
   location: string;
   windowLabel: string;
 }) {
-
   return (
     <Shell
       title={`Good evening, ${greetingName}.`}
       subtitle={`${location} • Window: ${windowLabel}`}
-
     >
       <div className="space-y-3">
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
           <div className="text-sm text-neutral-600">Categories</div>
           <div className="mt-2 flex flex-wrap gap-2">
-            {["Top", "World", "Business", "Tech", "Science", "Sports"].map((c) => (
-              <span
-                key={c}
-                className="text-xs rounded-full border px-3 py-1 bg-neutral-50"
-              >
-                {c}
-              </span>
-            ))}
+            {['Top', 'World', 'Business', 'Tech', 'Science', 'Sports'].map(
+              (c) => (
+                <span
+                  key={c}
+                  className="rounded-full border bg-neutral-50 px-3 py-1 text-xs"
+                >
+                  {c}
+                </span>
+              ),
+            )}
           </div>
         </div>
 
-        <p className="text-sm text-neutral-700">
-          Swipe up to start reading.
-        </p>
+        <p className="text-sm text-neutral-700">Swipe up to start reading.</p>
       </div>
     </Shell>
   );
@@ -90,22 +95,37 @@ export function HomeCard({
 
 export function NewsCard({ payload }: { payload: NewsCardPayload }) {
   return (
-    <Shell title={payload.headline} subtitle={payload.source ? `Source: ${payload.source}` : undefined}>
+    <Shell
+      title={payload.headline}
+      subtitle={payload.source ? `Source: ${payload.source}` : undefined}
+    >
       <div className="space-y-5">
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold text-neutral-500">WHAT HAPPENED</div>
-          <p className="mt-2 text-neutral-800 leading-relaxed">{payload.whatHappened}</p>
+          <div className="text-xs font-semibold text-neutral-500">
+            WHAT HAPPENED
+          </div>
+          <p className="mt-2 text-neutral-800 leading-relaxed">
+            {payload.whatHappened}
+          </p>
         </section>
 
         <section className="rounded-2xl border bg-white p-5 shadow-sm">
-          <div className="text-xs font-semibold text-neutral-500">WHY IT MATTERS</div>
-          <p className="mt-2 text-neutral-800 leading-relaxed">{payload.whyItMatters}</p>
+          <div className="text-xs font-semibold text-neutral-500">
+            WHY IT MATTERS
+          </div>
+          <p className="mt-2 text-neutral-800 leading-relaxed">
+            {payload.whyItMatters}
+          </p>
         </section>
 
         {payload.whatsNext ? (
           <section className="rounded-2xl border bg-white p-5 shadow-sm">
-            <div className="text-xs font-semibold text-neutral-500">WHAT’S NEXT</div>
-            <p className="mt-2 text-neutral-800 leading-relaxed">{payload.whatsNext}</p>
+            <div className="text-xs font-semibold text-neutral-500">
+              WHAT’S NEXT
+            </div>
+            <p className="mt-2 text-neutral-800 leading-relaxed">
+              {payload.whatsNext}
+            </p>
           </section>
         ) : null}
       </div>
@@ -161,17 +181,17 @@ export function EndExtendedCard() {
 
 export function RenderCard({ card }: { card: ScreenCard }) {
   switch (card.type) {
-    case "WELCOME":
+    case 'WELCOME':
       return <WelcomeCard />;
-    case "HOME":
+    case 'HOME':
       return <HomeCard {...card.payload} />;
-    case "NEWS":
+    case 'NEWS':
       return <NewsCard payload={card.payload} />;
-    case "END_TODAY":
+    case 'END_TODAY':
       return <EndTodayCard />;
-    case "EXTENDED":
+    case 'EXTENDED':
       return <ExtendedCard />;
-    case "END_EXTENDED":
+    case 'END_EXTENDED':
       return <EndExtendedCard />;
     default:
       return null;
