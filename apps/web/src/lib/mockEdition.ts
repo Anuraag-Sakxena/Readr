@@ -1,3 +1,8 @@
+import { getCurrent12HourWindow } from "@/lib/timeWindow";
+
+
+
+
 export type ScreenCardType =
   | "WELCOME"
   | "HOME"
@@ -16,15 +21,19 @@ export type NewsCardPayload = {
 
 export type ScreenCard =
   | { id: string; type: "WELCOME" }
-  | { id: string; type: "HOME"; payload: { greetingName: string; location: string } }
+| { id: string; type: "HOME"; payload: { greetingName: string; location: string; windowLabel: string } }
+
   | { id: string; type: "NEWS"; payload: NewsCardPayload }
   | { id: string; type: "END_TODAY" }
   | { id: string; type: "EXTENDED" }
   | { id: string; type: "END_EXTENDED" };
 
-export const mockEdition: ScreenCard[] = [
+const windowLabel = getCurrent12HourWindow().label;
+
+  export const mockEdition: ScreenCard[] = [
   { id: "welcome-1", type: "WELCOME" },
-  { id: "home-1", type: "HOME", payload: { greetingName: "Anuraag", location: "Dallas, TX" } },
+  { id: "home-1", type: "HOME", payload: { greetingName: "Anuraag", location: "Dallas, TX", windowLabel } },
+
 
   {
     id: "news-1",

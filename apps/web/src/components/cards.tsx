@@ -48,11 +48,21 @@ export function WelcomeCard() {
   );
 }
 
-export function HomeCard({ greetingName, location }: { greetingName: string; location: string }) {
+export function HomeCard({
+  greetingName,
+  location,
+  windowLabel,
+}: {
+  greetingName: string;
+  location: string;
+  windowLabel: string;
+}) {
+
   return (
     <Shell
       title={`Good evening, ${greetingName}.`}
-      subtitle={`${location} • Today’s Edition`}
+      subtitle={`${location} • Window: ${windowLabel}`}
+
     >
       <div className="space-y-3">
         <div className="rounded-2xl border bg-white p-5 shadow-sm">
