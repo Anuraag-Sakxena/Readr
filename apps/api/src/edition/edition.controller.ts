@@ -1,11 +1,14 @@
 import { Controller, Get } from '@nestjs/common';
+import { getCurrent12HourWindowLabel } from '../lib/timeWindow';
 
 @Controller('edition')
 export class EditionController {
   @Get('current')
   current() {
+    const windowLabel = getCurrent12HourWindowLabel();
+
     return {
-      window: 'mock',
+      window: windowLabel,
       cards: [
         { id: 'welcome-1', type: 'WELCOME' },
         {
@@ -14,7 +17,7 @@ export class EditionController {
           payload: {
             greetingName: 'Anuraag',
             location: 'Dallas, TX',
-            windowLabel: 'mock',
+            windowLabel,
           },
         },
         {
