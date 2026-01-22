@@ -1,6 +1,6 @@
-import type { EditionResponse, ScreenCard } from '@readr/contracts';
+import type { EditionResponse } from '@readr/contracts';
 
-export async function fetchCurrentEdition(): Promise<ScreenCard[]> {
+export async function fetchCurrentEdition(): Promise<EditionResponse> {
   const res = await fetch('http://localhost:3001/edition/current', {
     cache: 'no-store',
   });
@@ -15,5 +15,5 @@ export async function fetchCurrentEdition(): Promise<ScreenCard[]> {
     throw new Error('Invalid edition response');
   }
 
-  return data.cards;
+  return data;
 }
