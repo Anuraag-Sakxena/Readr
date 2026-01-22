@@ -65,3 +65,6 @@ export const mockEdition: ScreenCard[] = [
 
   { id: "end-extended-1", type: "END_EXTENDED" },
 ];
+
+export const isEndToday = (card: ScreenCard) => card.type === "END_TODAY";
+export const isEndExtended = (card: ScreenCard) => card.type === "END_EXTENDED";

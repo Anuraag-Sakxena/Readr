@@ -2,7 +2,10 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { ScreenCard } from "@/lib/mockEdition";
+import { isEndExtended, isEndToday } from "@/lib/mockEdition";
 import { RenderCard } from "@/components/cards";
+
+
 
 type Props = {
   cards: ScreenCard[];
@@ -10,6 +13,9 @@ type Props = {
 
 export default function ScreenCardEngine({ cards }: Props) {
   const [index, setIndex] = useState(0);
+  const [completedToday, setCompletedToday] = useState(false);
+  const [completedExtended, setCompletedExtended] = useState(false);
+
 
   const clampIndex = (next: number) => Math.max(0, Math.min(cards.length - 1, next));
 
@@ -27,6 +33,15 @@ export default function ScreenCardEngine({ cards }: Props) {
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+  const current = cards[index];
+  if (!current) return;
+
+  if (isEndToday(current)) setCompletedToday(true);
+  if (isEndExtended(current)) setCompletedExtended(true);
+}, [cards, index]);
+
 
   // Touch/Pointer swipe
   const startYRef = useRef<number | null>(null);
@@ -103,7 +118,15 @@ export default function ScreenCardEngine({ cards }: Props) {
           ))}
         </div>
 
+        
+
         <div className="fixed left-4 bottom-4 flex gap-2">
+          {(completedToday || completedExtended) ? (
+  <div className="fixed left-4 top-4 rounded-full border bg-white px-3 py-1 text-xs text-neutral-700 shadow-sm">
+    {completedExtended ? "Session complete" : "Today’s edition complete"}
+  </div>
+) : null}
+
           <button
             onClick={() => go(-1)}
             className="rounded-full border bg-white px-4 py-2 text-sm shadow-sm disabled:opacity-40"
