@@ -12,6 +12,7 @@ export class EditionController {
       window: windowLabel,
       cards: [
         { id: 'welcome-1', type: 'WELCOME' },
+
         {
           id: 'home-1',
           type: 'HOME',
@@ -21,6 +22,7 @@ export class EditionController {
             windowLabel,
           },
         },
+
         {
           id: 'news-1',
           type: 'NEWS',
@@ -35,7 +37,41 @@ export class EditionController {
             source: 'Mock Source',
           },
         },
+
+        {
+          id: 'news-2',
+          type: 'NEWS',
+          payload: {
+            headline:
+              'City expands transit pilot program to more neighborhoods',
+            whatHappened:
+              'A new set of routes will be added to improve connectivity during peak hours.',
+            whyItMatters:
+              'Better access can reduce commute times and ease road congestion.',
+            source: 'Mock Source',
+          },
+        },
+
         { id: 'end-today-1', type: 'END_TODAY' },
+
+        { id: 'extended-1', type: 'EXTENDED' },
+
+        {
+          id: 'news-3',
+          type: 'NEWS',
+          payload: {
+            headline:
+              'Tech firms highlight AI safety controls in new deployments',
+            whatHappened:
+              'Several companies described guardrails and evaluation methods for their latest releases.',
+            whyItMatters:
+              'Better controls reduce risk and improve trust as AI adoption accelerates.',
+            whatsNext:
+              'Expect more standardization around testing and reporting.',
+            source: 'Mock Source',
+          },
+        },
+
         { id: 'end-extended-1', type: 'END_EXTENDED' },
       ],
     };
