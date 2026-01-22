@@ -1,10 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
+import type { EditionResponse } from '@readr/contracts';
 import { getCurrent12HourWindowLabel } from '../lib/timeWindow';
 
 @Controller('edition')
 export class EditionController {
   @Get('current')
-  current() {
+  current(): EditionResponse {
     const windowLabel = getCurrent12HourWindowLabel();
 
     return {

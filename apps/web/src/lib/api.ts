@@ -1,9 +1,4 @@
-import type { ScreenCard } from '@/lib/mockEdition';
-
-type EditionResponse = {
-  window: string;
-  cards: ScreenCard[];
-};
+import type { EditionResponse, ScreenCard } from '@readr/contracts';
 
 export async function fetchCurrentEdition(): Promise<ScreenCard[]> {
   const res = await fetch('http://localhost:3001/edition/current', {

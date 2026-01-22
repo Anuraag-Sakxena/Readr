@@ -1,4 +1,5 @@
-import type { NewsCardPayload, ScreenCard } from "@/lib/mockEdition";
+import type { NewsCardPayload, ScreenCard } from '@readr/contracts';
+
 
 function Shell({
   title,
