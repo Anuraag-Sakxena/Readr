@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { EditionResponse } from '@readr/contracts';
+import type { EditionResponse, ScreenCard } from '@readr/contracts';
 import ScreenCardEngine from '@/components/ScreenCardEngine';
 import { mockEdition } from '@/lib/mockEdition';
 import {
@@ -9,13 +9,38 @@ import {
   fetchCurrentSession,
   type SessionState,
 } from '@/lib/api';
-import type { ScreenCard } from '@readr/contracts';
+
+type LocalSessionState = {
+  window: string;
+  completedToday: boolean;
+  completedExtended: boolean;
+};
 
 function getWindowLabelFromCards(cards: ScreenCard[]): string {
   const home = cards.find((c) => c.type === 'HOME');
-  return home && home.type === 'HOME'
-    ? home.payload.windowLabel
-    : 'unknown-window';
+  return home && home.type === 'HOME' ? home.payload.windowLabel : 'unknown-window';
+}
+
+function storageKey(windowLabel: string) {
+  return `readr:session:${windowLabel}`;
+}
+
+function safeReadLocal(windowLabel: string): LocalSessionState | null {
+  try {
+    const raw = localStorage.getItem(storageKey(windowLabel));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LocalSessionState;
+    if (
+      typeof parsed?.window === 'string' &&
+      typeof parsed?.completedToday === 'boolean' &&
+      typeof parsed?.completedExtended === 'boolean'
+    ) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export default function Home() {
@@ -26,30 +51,34 @@ export default function Home() {
     let alive = true;
 
     (async () => {
+      // 1) Always try to load edition (API first, fallback to local mock)
+      let resolvedEdition: EditionResponse;
       try {
-        const [apiEdition, apiSession] = await Promise.all([
-          fetchCurrentEdition(),
-          fetchCurrentSession(),
-        ]);
+        resolvedEdition = await fetchCurrentEdition();
+      } catch {
+        const fallbackWindow = getWindowLabelFromCards(mockEdition);
+        resolvedEdition = { window: fallbackWindow, cards: mockEdition };
+      }
 
+      if (!alive) return;
+      setEdition(resolvedEdition);
+
+      // 2) Try to load session from backend; if it fails, fallback to localStorage
+      try {
+        const apiSession = await fetchCurrentSession();
         if (!alive) return;
-        setEdition(apiEdition);
         setSession(apiSession);
       } catch {
         if (!alive) return;
 
-        const fallbackWindow = getWindowLabelFromCards(mockEdition);
-        setEdition({
-          window: fallbackWindow,
-          cards: mockEdition,
-        });
-
-        // local fallback session
-        setSession({
-          window: fallbackWindow,
-          completedToday: false,
-          completedExtended: false,
-        });
+        const local = safeReadLocal(resolvedEdition.window);
+        setSession(
+          local ?? {
+            window: resolvedEdition.window,
+            completedToday: false,
+            completedExtended: false,
+          },
+        );
       }
     })();
 

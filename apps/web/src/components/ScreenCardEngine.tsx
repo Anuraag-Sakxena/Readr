@@ -16,6 +16,42 @@ type Props = {
   initialSession: SessionState;
 };
 
+type LocalSessionState = {
+  window: string;
+  completedToday: boolean;
+  completedExtended: boolean;
+};
+
+function storageKey(windowLabel: string) {
+  return `readr:session:${windowLabel}`;
+}
+
+function safeWriteLocal(windowLabel: string, state: LocalSessionState) {
+  try {
+    localStorage.setItem(storageKey(windowLabel), JSON.stringify(state));
+  } catch {
+    // ignore storage errors (private mode, etc.)
+  }
+}
+
+function safeReadLocal(windowLabel: string): LocalSessionState | null {
+  try {
+    const raw = localStorage.getItem(storageKey(windowLabel));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as LocalSessionState;
+    if (
+      typeof parsed?.window === 'string' &&
+      typeof parsed?.completedToday === 'boolean' &&
+      typeof parsed?.completedExtended === 'boolean'
+    ) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function findIndex(cards: ScreenCard[], type: ScreenCard['type']) {
   const idx = cards.findIndex((c) => c.type === type);
   return idx >= 0 ? idx : 0;
@@ -27,12 +63,20 @@ export default function ScreenCardEngine({
   initialSession,
 }: Props) {
   const [index, setIndex] = useState(0);
-  const [completedToday, setCompletedToday] = useState(
-    initialSession.completedToday,
-  );
-  const [completedExtended, setCompletedExtended] = useState(
-    initialSession.completedExtended,
-  );
+
+  // HYBRID RULE:
+  // - Prefer backend state (initialSession)
+  // - If local has "more completed" than backend (because backend restarted), use local
+  const localBackup = typeof window !== 'undefined' ? safeReadLocal(windowLabel) : null;
+
+  const seedCompletedToday =
+    localBackup?.completedToday ?? initialSession.completedToday;
+
+  const seedCompletedExtended =
+    localBackup?.completedExtended ?? initialSession.completedExtended;
+
+  const [completedToday, setCompletedToday] = useState(seedCompletedToday);
+  const [completedExtended, setCompletedExtended] = useState(seedCompletedExtended);
 
   const clampIndex = (next: number) =>
     Math.max(0, Math.min(cards.length - 1, next));
@@ -49,7 +93,7 @@ export default function ScreenCardEngine({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windowLabel]);
 
-  // Keyboard
+  // Keyboard navigation
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') go(1);
@@ -60,7 +104,10 @@ export default function ScreenCardEngine({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // When landing on end cards, update UI state + notify backend
+  // When landing on end cards:
+  // - update UI state
+  // - write localStorage backup
+  // - call backend (best effort)
   useEffect(() => {
     const current = cards[index];
     if (!current) return;
@@ -69,22 +116,40 @@ export default function ScreenCardEngine({
       try {
         if (isEndToday(current) && !completedToday) {
           setCompletedToday(true);
+
+          // local backup
+          safeWriteLocal(windowLabel, {
+            window: windowLabel,
+            completedToday: true,
+            completedExtended,
+          });
+
+          // backend best-effort
           await completeToday(windowLabel);
         }
 
         if (isEndExtended(current) && !completedExtended) {
           setCompletedToday(true);
           setCompletedExtended(true);
+
+          // local backup
+          safeWriteLocal(windowLabel, {
+            window: windowLabel,
+            completedToday: true,
+            completedExtended: true,
+          });
+
+          // backend best-effort
           await completeExtended(windowLabel);
         }
       } catch {
-        // If backend fails, we still keep UI completed (calm behavior)
+        // If backend fails, localStorage still preserves completion.
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
-  // Swipe
+  // Touch/Pointer swipe
   const startYRef = useRef<number | null>(null);
   const lastYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
