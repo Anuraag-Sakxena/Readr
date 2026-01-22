@@ -12,6 +12,7 @@ import { SessionController } from './session/session.controller';
 import { EditionEntity } from './db/entities/edition.entity';
 import { CardEntity } from './db/entities/card.entity';
 import { SessionEntity } from './db/entities/session.entity';
+import { WindowService } from './window/window.service';
 
 @Module({
   imports: [
@@ -39,6 +40,6 @@ import { SessionEntity } from './db/entities/session.entity';
     EditionController,
     SessionController,
   ],
-  providers: [AppService],
+  providers: [AppService, WindowService],
 })
 export class AppModule {}

@@ -1,3 +1,9 @@
+export type TimeWindow = {
+  windowStart: Date;
+  windowEnd: Date;
+  label: string; // e.g. "2026-01-21 12:00–23:59"
+};
+
 function pad(n: number) {
   return String(n).padStart(2, '0');
 }
@@ -11,12 +17,11 @@ function fmtTime(d: Date) {
 }
 
 /**
- * Returns a label like: "2026-01-21 12:00–23:59"
- * Window rules:
+ * Local, deterministic 12-hour window:
  * - 00:00–11:59
  * - 12:00–23:59
  */
-export function getCurrent12HourWindowLabel(now = new Date()): string {
+export function getCurrent12HourWindow(now = new Date()): TimeWindow {
   const start = new Date(now);
   const hour = start.getHours();
 
@@ -27,7 +32,15 @@ export function getCurrent12HourWindowLabel(now = new Date()): string {
   }
 
   const end = new Date(start);
-  end.setHours(start.getHours() + 11, 59, 0, 0); // 11:59 or 23:59
+  end.setHours(start.getHours() + 11, 59, 59, 999);
 
-  return `${fmtDate(start)} ${fmtTime(start)}–${fmtTime(end)}`;
+  const label = `${fmtDate(start)} ${fmtTime(start)}–${fmtTime(end)}`;
+  return { windowStart: start, windowEnd: end, label };
+}
+
+/**
+ * Back-compat helper (your controllers already import this).
+ */
+export function getCurrent12HourWindowLabel(now = new Date()): string {
+  return getCurrent12HourWindow(now).label;
 }

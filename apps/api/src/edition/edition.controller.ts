@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { CardEntity } from '../db/entities/card.entity';
 import { EditionEntity } from '../db/entities/edition.entity';
 import { getCurrent12HourWindowLabel } from '../lib/timeWindow';
+import { WindowService } from '../window/window.service';
 
 // Derive the specific card union members from ScreenCard (no need to import HomeCard/NewsCard)
 type HomeCard = Extract<ScreenCard, { type: 'HOME' }>;
@@ -55,11 +56,15 @@ export class EditionController {
   constructor(
     @InjectRepository(EditionEntity)
     private readonly editions: Repository<EditionEntity>,
+    private readonly windowService: WindowService,
   ) {}
 
   @Get('current')
   async current(): Promise<EditionResponse> {
     const windowLabel = getCurrent12HourWindowLabel();
+
+    // Option D: auto-create the edition/session when the window flips
+    await this.windowService.ensureWindowReady(windowLabel);
 
     const edition = await this.editions.findOne({
       where: { windowLabel },
