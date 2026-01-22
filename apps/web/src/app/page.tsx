@@ -1,37 +1,55 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { ScreenCard, EditionResponse } from '@readr/contracts';
+import type { EditionResponse } from '@readr/contracts';
 import ScreenCardEngine from '@/components/ScreenCardEngine';
 import { mockEdition } from '@/lib/mockEdition';
-import { fetchCurrentEdition } from '@/lib/api';
+import {
+  fetchCurrentEdition,
+  fetchCurrentSession,
+  type SessionState,
+} from '@/lib/api';
+import type { ScreenCard } from '@readr/contracts';
 
 function getWindowLabelFromCards(cards: ScreenCard[]): string {
   const home = cards.find((c) => c.type === 'HOME');
-  if (home && home.type === 'HOME') return home.payload.windowLabel;
-  return 'unknown-window';
+  return home && home.type === 'HOME'
+    ? home.payload.windowLabel
+    : 'unknown-window';
 }
 
 export default function Home() {
   const [edition, setEdition] = useState<EditionResponse | null>(null);
+  const [session, setSession] = useState<SessionState | null>(null);
 
   useEffect(() => {
     let alive = true;
 
     (async () => {
       try {
-        const apiEdition = await fetchCurrentEdition();
-        if (alive) setEdition(apiEdition);
+        const [apiEdition, apiSession] = await Promise.all([
+          fetchCurrentEdition(),
+          fetchCurrentSession(),
+        ]);
+
+        if (!alive) return;
+        setEdition(apiEdition);
+        setSession(apiSession);
       } catch {
         if (!alive) return;
 
-        // fallback to local mock
-        const fallback: EditionResponse = {
-          window: getWindowLabelFromCards(mockEdition),
+        const fallbackWindow = getWindowLabelFromCards(mockEdition);
+        setEdition({
+          window: fallbackWindow,
           cards: mockEdition,
-        };
+        });
 
-        setEdition(fallback);
+        // local fallback session
+        setSession({
+          window: fallbackWindow,
+          completedToday: false,
+          completedExtended: false,
+        });
       }
     })();
 
@@ -40,7 +58,7 @@ export default function Home() {
     };
   }, []);
 
-  if (!edition) {
+  if (!edition || !session) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-neutral-50">
         <div className="rounded-2xl border bg-white px-5 py-3 text-sm text-neutral-700 shadow-sm">
@@ -50,5 +68,11 @@ export default function Home() {
     );
   }
 
-  return <ScreenCardEngine cards={edition.cards} windowLabel={edition.window} />;
+  return (
+    <ScreenCardEngine
+      cards={edition.cards}
+      windowLabel={edition.window}
+      initialSession={session}
+    />
+  );
 }

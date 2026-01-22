@@ -4,89 +4,52 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ScreenCard } from '@readr/contracts';
 import { RenderCard } from '@/components/cards';
 import { isEndExtended, isEndToday } from '@/lib/mockEdition';
+import {
+  completeExtended,
+  completeToday,
+  type SessionState,
+} from '@/lib/api';
 
 type Props = {
   cards: ScreenCard[];
-  windowLabel: string; // key for persistence
+  windowLabel: string;
+  initialSession: SessionState;
 };
-
-type PersistedState = {
-  completedToday: boolean;
-  completedExtended: boolean;
-};
-
-function storageKey(windowLabel: string) {
-  return `readr:session:${windowLabel}`;
-}
-
-function safeRead(windowLabel: string): PersistedState | null {
-  try {
-    const raw = localStorage.getItem(storageKey(windowLabel));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as PersistedState;
-    if (
-      typeof parsed?.completedToday === 'boolean' &&
-      typeof parsed?.completedExtended === 'boolean'
-    ) {
-      return parsed;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-function safeWrite(windowLabel: string, state: PersistedState) {
-  try {
-    localStorage.setItem(storageKey(windowLabel), JSON.stringify(state));
-  } catch {
-    // ignore storage errors (private mode, etc.)
-  }
-}
 
 function findIndex(cards: ScreenCard[], type: ScreenCard['type']) {
-  return Math.max(
-    0,
-    cards.findIndex((c) => c.type === type),
-  );
+  const idx = cards.findIndex((c) => c.type === type);
+  return idx >= 0 ? idx : 0;
 }
 
-export default function ScreenCardEngine({ cards, windowLabel }: Props) {
+export default function ScreenCardEngine({
+  cards,
+  windowLabel,
+  initialSession,
+}: Props) {
   const [index, setIndex] = useState(0);
-  const [completedToday, setCompletedToday] = useState(false);
-  const [completedExtended, setCompletedExtended] = useState(false);
+  const [completedToday, setCompletedToday] = useState(
+    initialSession.completedToday,
+  );
+  const [completedExtended, setCompletedExtended] = useState(
+    initialSession.completedExtended,
+  );
 
   const clampIndex = (next: number) =>
     Math.max(0, Math.min(cards.length - 1, next));
 
-  const go = (delta: number) => {
-    setIndex((prev) => clampIndex(prev + delta));
-  };
+  const go = (delta: number) => setIndex((prev) => clampIndex(prev + delta));
 
-  // 1) On first load (or when windowLabel changes), restore persisted completion
+  // On load: if session already completed, jump to end card
   useEffect(() => {
-    if (!windowLabel) return;
-
-    const persisted = safeRead(windowLabel);
-    if (!persisted) {
-      setCompletedToday(false);
-      setCompletedExtended(false);
-      return;
-    }
-
-    setCompletedToday(persisted.completedToday);
-    setCompletedExtended(persisted.completedExtended);
-
-    // If already completed, jump to the correct end card
-    if (persisted.completedExtended) {
+    if (completedExtended) {
       setIndex(clampIndex(findIndex(cards, 'END_EXTENDED')));
-    } else if (persisted.completedToday) {
+    } else if (completedToday) {
       setIndex(clampIndex(findIndex(cards, 'END_TODAY')));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windowLabel]);
 
-  // 2) Keyboard navigation
+  // Keyboard
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowDown') go(1);
@@ -97,41 +60,36 @@ export default function ScreenCardEngine({ cards, windowLabel }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 3) Track completion when landing on end cards + persist
+  // When landing on end cards, update UI state + notify backend
   useEffect(() => {
     const current = cards[index];
     if (!current) return;
 
-    let nextToday = completedToday;
-    let nextExtended = completedExtended;
+    (async () => {
+      try {
+        if (isEndToday(current) && !completedToday) {
+          setCompletedToday(true);
+          await completeToday(windowLabel);
+        }
 
-    if (isEndToday(current)) nextToday = true;
-    if (isEndExtended(current)) nextExtended = true;
-
-    if (nextToday !== completedToday) setCompletedToday(nextToday);
-    if (nextExtended !== completedExtended) setCompletedExtended(nextExtended);
-
-    if (!windowLabel) return;
-
-    // Persist whenever we change completion
-    if (
-      nextToday !== completedToday ||
-      nextExtended !== completedExtended
-    ) {
-      safeWrite(windowLabel, {
-        completedToday: nextToday,
-        completedExtended: nextExtended,
-      });
-    }
+        if (isEndExtended(current) && !completedExtended) {
+          setCompletedToday(true);
+          setCompletedExtended(true);
+          await completeExtended(windowLabel);
+        }
+      } catch {
+        // If backend fails, we still keep UI completed (calm behavior)
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cards, index]);
+  }, [index]);
 
-  // Touch/Pointer swipe
+  // Swipe
   const startYRef = useRef<number | null>(null);
   const lastYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
 
-  const SWIPE_THRESHOLD = 60; // px
+  const SWIPE_THRESHOLD = 60;
 
   const onPointerDown = (e: React.PointerEvent) => {
     draggingRef.current = true;
@@ -155,11 +113,11 @@ export default function ScreenCardEngine({ cards, windowLabel }: Props) {
 
     if (startY == null || lastY == null) return;
 
-    const delta = lastY - startY; // + down, - up
+    const delta = lastY - startY;
     if (Math.abs(delta) < SWIPE_THRESHOLD) return;
 
-    if (delta < 0) go(1); // swipe up
-    if (delta > 0) go(-1); // swipe down
+    if (delta < 0) go(1);
+    if (delta > 0) go(-1);
   };
 
   const translateY = useMemo(() => `-${index * 100}vh`, [index]);
@@ -184,14 +142,12 @@ export default function ScreenCardEngine({ cards, windowLabel }: Props) {
           ))}
         </div>
 
-        {/* Calm completion badge */}
         {completedToday || completedExtended ? (
           <div className="fixed left-4 top-4 rounded-full border bg-white px-3 py-1 text-xs text-neutral-700 shadow-sm">
             {completedExtended ? 'Session complete' : 'Today’s edition complete'}
           </div>
         ) : null}
 
-        {/* Minimal nav (utility only) */}
         <div className="fixed right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2">
           {cards.map((c, i) => (
             <button
