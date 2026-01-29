@@ -5,7 +5,10 @@ import type { NewsCardPayload } from '@readr/contracts';
 
 import { EditionEntity } from '../db/entities/edition.entity';
 import { CardEntity } from '../db/entities/card.entity';
+
 import { SummarizerService } from '../ai/summarizer.service';
+import { SummaryCacheService } from '../ai/summary-cache.service';
+
 import { RssIngestionService } from './rss.service';
 
 type ComposeArgs = {
@@ -30,6 +33,7 @@ export class EditionComposerService {
     private readonly cards: Repository<CardEntity>,
     private readonly rss: RssIngestionService,
     private readonly summarizer: SummarizerService,
+    private readonly cache: SummaryCacheService,
   ) {}
 
   private pushCard(
@@ -119,17 +123,37 @@ export class EditionComposerService {
     const newsCards: CardEntity[] = [];
 
     for (const item of items) {
-      const base: NewsCardPayload = await this.summarizer.summarize({
-        title: item.title,
-        source: item.source ?? 'Unknown Source',
-        url: item.link,
-        snippet: item.snippet,
-      });
+      const url = item.link;
+      const source = item.source ?? 'Unknown Source';
 
-      // Store url in DB payload as extra json field (contracts don't include it yet)
+      // ✅ 1) Cache lookup
+      const cached = await this.cache.getByUrl(url);
+
+      let base: NewsCardPayload;
+      if (cached) {
+        base = cached;
+      } else {
+        // ✅ 2) Call OpenAI only if missing
+        base = await this.summarizer.summarize({
+          title: item.title,
+          source,
+          url,
+          snippet: item.snippet,
+        });
+
+        // ✅ 3) Save cache
+        await this.cache.set({
+          url,
+          title: item.title,
+          source,
+          payload: base,
+        });
+      }
+
+      // Store url in DB payload as extra json field (contracts don’t include it yet)
       const payloadWithUrl: Record<string, unknown> = {
         ...base,
-        url: item.link,
+        url,
       };
 
       newsCards.push(
