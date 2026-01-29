@@ -91,7 +91,7 @@ export default function ScreenCardEngine({
   const canAdvanceFrom = (idx: number) => {
     const current = cards[idx];
     if (!current) return false;
-    return !isEndExtended(current); // hard stop at END_EXTENDED
+    return !isEndExtended(current);
   };
 
   const go = (delta: number) => {
@@ -103,7 +103,6 @@ export default function ScreenCardEngine({
     });
   };
 
-  // Jump to the appropriate end card on load based on completion
   useEffect(() => {
     if (completedExtended) {
       const endIdx = findIndex(cards, 'END_EXTENDED');
@@ -118,7 +117,6 @@ export default function ScreenCardEngine({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windowLabel]);
 
-  // Keyboard navigation (DEV only)
   useEffect(() => {
     if (!isDev) return;
 
@@ -132,7 +130,6 @@ export default function ScreenCardEngine({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDev, cards.length]);
 
-  // Completion side-effects
   useEffect(() => {
     const current = cards[index];
     if (!current) return;
@@ -170,7 +167,6 @@ export default function ScreenCardEngine({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
-  // Progress (F3)
   const endTodayIdx = useMemo(() => findIndex(cards, 'END_TODAY'), [cards]);
   const extendedIdx = useMemo(() => findIndex(cards, 'EXTENDED'), [cards]);
   const endExtendedIdx = useMemo(
@@ -211,7 +207,6 @@ export default function ScreenCardEngine({
     return `${index + 1} / ${cards.length}`;
   }, [cards.length, endExtendedIdx, endTodayIdx, extendedIdx, index]);
 
-  // Pointer swipe (drag)
   const startYRef = useRef<number | null>(null);
   const lastYRef = useRef<number | null>(null);
   const draggingRef = useRef(false);
@@ -223,7 +218,6 @@ export default function ScreenCardEngine({
     startYRef.current = e.clientY;
     lastYRef.current = e.clientY;
 
-    // Improves reliability: keep receiving move/up events even if pointer leaves element
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -260,13 +254,11 @@ export default function ScreenCardEngine({
     if (delta > 0) go(-1);
   };
 
-  // ✅ Wheel / trackpad scroll support (this is what you want)
   const lastWheelAtRef = useRef(0);
   const WHEEL_COOLDOWN_MS = 450;
   const WHEEL_THRESHOLD = 30;
 
   const onWheel = (e: React.WheelEvent) => {
-    // prevent the browser from trying to scroll the page (we control navigation)
     e.preventDefault();
 
     const now = Date.now();
@@ -286,7 +278,21 @@ export default function ScreenCardEngine({
   const canGoForward = index < cards.length - 1 && canAdvanceFrom(index);
 
   return (
-    <div className="h-screen w-screen overflow-hidden bg-neutral-50 overscroll-none">
+    <div className="h-screen w-screen overflow-hidden bg-neutral-100 overscroll-none">
+      {/* Progress */}
+      {progressText ? (
+        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 rounded-full border bg-white/80 px-3 py-1 text-xs text-neutral-800 shadow-sm backdrop-blur-md">
+          {progressText}
+        </div>
+      ) : null}
+
+      {/* Completion chip */}
+      {completedToday || completedExtended ? (
+        <div className="fixed left-4 top-4 z-50 rounded-full border bg-white/80 px-3 py-1 text-xs text-neutral-800 shadow-sm backdrop-blur-md">
+          {completedExtended ? 'Session complete' : 'Today’s edition complete'}
+        </div>
+      ) : null}
+
       <div
         className="h-full w-full touch-none select-none"
         onPointerDown={onPointerDown}
@@ -306,21 +312,9 @@ export default function ScreenCardEngine({
           ))}
         </div>
 
-        {progressText ? (
-          <div className="fixed left-1/2 top-4 -translate-x-1/2 rounded-full border bg-white px-3 py-1 text-xs text-neutral-700 shadow-sm">
-            {progressText}
-          </div>
-        ) : null}
-
-        {completedToday || completedExtended ? (
-          <div className="fixed left-4 top-4 rounded-full border bg-white px-3 py-1 text-xs text-neutral-700 shadow-sm">
-            {completedExtended ? 'Session complete' : 'Today’s edition complete'}
-          </div>
-        ) : null}
-
-        {/* DEV-only buttons */}
+        {/* DEV-only controls */}
         {isDev ? (
-          <div className="fixed left-4 bottom-4 flex gap-2">
+          <div className="fixed left-4 bottom-4 z-50 flex gap-2">
             <button
               onClick={() => go(-1)}
               className="rounded-full border bg-white px-4 py-2 text-sm shadow-sm disabled:opacity-40"
