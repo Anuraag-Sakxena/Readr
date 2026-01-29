@@ -5,6 +5,7 @@ import type { EditionResponse } from '@readr/contracts';
 import { AppModule } from './app.module';
 import { seedIfEmpty } from './db/seed';
 import { getCurrent12HourWindowLabel } from './lib/timeWindow';
+import { WindowService } from './window/window.service';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -16,6 +17,8 @@ async function bootstrap() {
   });
 
   const dataSource = app.get(DataSource);
+  const windowService = app.get(WindowService);
+
   const windowLabel = getCurrent12HourWindowLabel();
 
   const mockEdition: EditionResponse = {
@@ -78,7 +81,11 @@ async function bootstrap() {
     ],
   };
 
+  // Seed a template edition (layout) if DB is empty for this window
   await seedIfEmpty(dataSource, mockEdition);
+
+  // Ensure the current window edition exists (and is RSS-built if template exists)
+  await windowService.ensureWindowReady(windowLabel);
 
   await app.listen(3001);
 }

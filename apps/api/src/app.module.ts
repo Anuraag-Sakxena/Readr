@@ -12,7 +12,11 @@ import { SessionController } from './session/session.controller';
 import { EditionEntity } from './db/entities/edition.entity';
 import { CardEntity } from './db/entities/card.entity';
 import { SessionEntity } from './db/entities/session.entity';
+
 import { WindowService } from './window/window.service';
+import { RssIngestionService } from './rss/rss.service';
+import { EditionComposerService } from './rss/edition-composer.service';
+import { SummarizerService } from './ai/summarizer.service';
 
 @Module({
   imports: [
@@ -40,6 +44,12 @@ import { WindowService } from './window/window.service';
     EditionController,
     SessionController,
   ],
-  providers: [AppService, WindowService],
+  providers: [
+    AppService,
+    WindowService,
+    SummarizerService,
+    RssIngestionService,
+    EditionComposerService,
+  ],
 })
 export class AppModule {}

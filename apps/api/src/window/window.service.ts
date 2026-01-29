@@ -2,17 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
-import { EditionEntity } from '../db/entities/edition.entity';
 import { CardEntity } from '../db/entities/card.entity';
+import { EditionEntity } from '../db/entities/edition.entity';
 import { SessionEntity } from '../db/entities/session.entity';
+import { EditionComposerService } from '../rss/edition-composer.service';
 
 @Injectable()
 export class WindowService {
   constructor(
     @InjectRepository(EditionEntity)
     private readonly editions: Repository<EditionEntity>,
+    @InjectRepository(CardEntity)
+    private readonly cards: Repository<CardEntity>,
     @InjectRepository(SessionEntity)
     private readonly sessions: Repository<SessionEntity>,
+    private readonly composer: EditionComposerService,
   ) {}
 
   private async ensureSessionExists(windowLabel: string): Promise<void> {
@@ -20,9 +24,7 @@ export class WindowService {
       where: { windowLabel },
     });
 
-    if (existing) {
-      return;
-    }
+    if (existing) return;
 
     const created = this.sessions.create({
       windowLabel,
@@ -33,8 +35,24 @@ export class WindowService {
     try {
       await this.sessions.save(created);
     } catch {
-      // Safe to ignore: unique constraint hit during race
+      // Ignore race (unique constraint)
     }
+  }
+
+  private isSeededMockEdition(edition: EditionEntity): boolean {
+    const newsCards = (edition.cards ?? []).filter((c) => c.type === 'NEWS');
+    if (newsCards.length === 0) return false;
+
+    return newsCards.every((c) => {
+      const payload = c.payload;
+      if (!payload || typeof payload !== 'object') return true;
+
+      const p = payload;
+      const source = typeof p.source === 'string' ? p.source : '';
+      const url = typeof p.url === 'string' ? p.url : '';
+
+      return source === 'Mock Source' || url === '';
+    });
   }
 
   async ensureWindowReady(windowLabel: string): Promise<void> {
@@ -43,41 +61,42 @@ export class WindowService {
       relations: ['cards'],
     });
 
-    if (existingEdition) {
+    if (existingEdition && !this.isSeededMockEdition(existingEdition)) {
       await this.ensureSessionExists(windowLabel);
       return;
     }
 
-    const template = await this.editions.findOne({
-      order: { windowLabel: 'DESC' },
-      relations: ['cards'],
+    const template =
+      existingEdition ??
+      (await this.editions.findOne({
+        order: { windowLabel: 'DESC' },
+        relations: ['cards'],
+      }));
+
+    const composed = await this.composer.composeFromTemplate({
+      windowLabel,
+      template,
     });
 
-    const edition = new EditionEntity();
-    edition.windowLabel = windowLabel;
+    if (existingEdition) {
+      await this.cards.delete({ edition: { id: existingEdition.id } });
 
-    if (template?.cards?.length) {
-      const sorted = [...template.cards].sort(
-        (a, b) => a.position - b.position,
-      );
+      existingEdition.cards = composed.cards;
 
-      edition.cards = sorted.map((c) => {
-        const card = new CardEntity();
-        card.cardId = c.cardId;
-        card.type = c.type;
-        card.position = c.position;
-        card.payload = c.payload ?? null;
-        card.edition = edition;
-        return card;
-      });
-    } else {
-      edition.cards = [];
+      try {
+        await this.editions.save(existingEdition);
+      } catch {
+        // ignore race
+      }
+
+      await this.ensureSessionExists(windowLabel);
+      return;
     }
 
     try {
-      await this.editions.save(edition);
+      await this.editions.save(composed);
     } catch {
-      // Safe to ignore: another request created it first
+      // ignore race
     }
 
     await this.ensureSessionExists(windowLabel);
